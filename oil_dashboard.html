@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Oil Game — An Interactive Briefing</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a08;
+    --surface: #111110;
+    --surface2: #1a1a17;
+    --border: #2a2a24;
+    --gold: #c9a84c;
+    --gold-dim: #7a6530;
+    --amber: #e8813a;
+    --rust: #b84c2a;
+    --sage: #7a9e7e;
+    --text: #e8e4d9;
+    --text-dim: #8a8678;
+    --text-muted: #4a4840;
+    --accent: #c9a84c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  header {
+    padding: 60px 48px 40px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 48px;
+    width: 120px;
+    height: 2px;
+    background: var(--gold);
+  }
+
+  .header-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.4rem, 5vw, 4rem);
+    font-weight: 900;
+    color: var(--text);
+    line-height: 1.05;
+    max-width: 700px;
+  }
+
+  h1 span {
+    color: var(--gold);
+  }
+
+  .header-sub {
+    margin-top: 16px;
+    color: var(--text-dim);
+    font-size: 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  main {
+    padding: 0 48px 80px;
+    max-width: 1200px;
+  }
+
+  /* Section toggles */
+  .section {
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 28px 0;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s;
+  }
+
+  .section-header:hover .section-title { color: var(--gold); }
+  .section-header:hover .section-num { color: var(--gold); }
+
+  .section-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    min-width: 40px;
+    transition: color 0.2s;
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    flex: 1;
+    transition: color 0.2s;
+  }
+
+  .section-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 2px;
+  }
+
+  .toggle-icon {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .section.open .toggle-icon {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  .section-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .section.open .section-body {
+    max-height: 2000px;
+  }
+
+  .section-content {
+    padding: 8px 0 48px 60px;
+  }
+
+  /* Chart containers */
+  .chart-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 32px;
+    margin-bottom: 24px;
+    position: relative;
+  }
+
+  .chart-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 24px;
+  }
+
+  .chart-note {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 16px;
+    letter-spacing: 1px;
+  }
+
+  /* SVG charts */
+  svg text { font-family: 'IBM Plex Mono', monospace; }
+
+  /* Refinery flow */
+  .refinery-svg { width: 100%; height: auto; }
+
+  /* Crude types grid */
+  .crude-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    margin-top: 8px;
+  }
+
+  .crude-card {
+    background: var(--surface2);
+    padding: 24px;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .crude-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+  }
+
+  .crude-card.ls::before { background: var(--gold); }
+  .crude-card.ss::before { background: var(--amber); }
+  .crude-card.lh::before { background: var(--text-dim); }
+  .crude-card.sh::before { background: var(--rust); }
+
+  .crude-card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .crude-card-subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .crude-card-desc {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-dim);
+  }
+
+  .crude-price-tag {
+    display: inline-block;
+    margin-top: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+  }
+
+  .crude-card.ls .crude-price-tag { background: rgba(201,168,76,0.15); color: var(--gold); }
+  .crude-card.ss .crude-price-tag { background: rgba(232,129,58,0.15); color: var(--amber); }
+  .crude-card.lh .crude-price-tag { background: rgba(138,134,120,0.15); color: var(--text-dim); }
+  .crude-card.sh .crude-price-tag { background: rgba(184,76,42,0.15); color: var(--rust); }
+
+  /* Bar charts */
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .bar-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    min-width: 140px;
+    letter-spacing: 0.5px;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 24px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .bar-fill::after {
+    content: attr(data-val);
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 1px;
+  }
+
+  /* Trade route map */
+  .map-container {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Timeline / trajectory */
+  .timeline {
+    position: relative;
+    padding-left: 24px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 1px;
+    background: linear-gradient(to bottom, var(--gold), var(--rust));
+  }
+
+  .timeline-item {
+    position: relative;
+    padding: 0 0 32px 28px;
+  }
+
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 6px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--gold);
+  }
+
+  .timeline-item.future::before { border-color: var(--rust); }
+  .timeline-item.speculative::before { border-color: var(--text-muted); border-style: dashed; }
+
+  .timeline-year {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--gold);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+
+  .timeline-item.future .timeline-year { color: var(--amber); }
+  .timeline-item.speculative .timeline-year { color: var(--text-muted); }
+
+  .timeline-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .timeline-desc {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-dim);
+  }
+
+  /* Thesis cards */
+  .thesis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .thesis-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 24px;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .thesis-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .thesis-card.bull::after { background: var(--sage); }
+  .thesis-card.bear::after { background: var(--rust); }
+  .thesis-card.neutral::after { background: var(--gold-dim); }
+
+  .thesis-card-icon {
+    font-size: 24px;
+    margin-bottom: 12px;
+  }
+
+  .thesis-card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .thesis-card-body {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-dim);
+  }
+
+  .thesis-signal {
+    display: inline-block;
+    margin-top: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+  }
+
+  .bull .thesis-signal { background: rgba(122,158,126,0.15); color: var(--sage); }
+  .bear .thesis-signal { background: rgba(184,76,42,0.15); color: var(--rust); }
+  .neutral .thesis-signal { background: rgba(122,101,48,0.2); color: var(--gold-dim); }
+
+  /* Donut / pie */
+  .donut-row {
+    display: flex;
+    gap: 32px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .legend-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+
+  .legend-val {
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* Cost comparison */
+  .cost-ladder {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cost-item {
+    display: grid;
+    grid-template-columns: 160px 1fr 80px;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .cost-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+
+  .cost-bar {
+    height: 20px;
+    border-radius: 2px;
+    position: relative;
+    transition: width 1s ease;
+  }
+
+  .cost-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: right;
+  }
+
+  /* Petrochemical chain */
+  .chem-chain {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .chem-level {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+    align-items: stretch;
+  }
+
+  .chem-level-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    min-width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chem-items {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+
+  .chem-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    border-radius: 2px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    position: relative;
+  }
+
+  .chem-item.highlight {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+
+  .chem-connector {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 18px;
+    margin: 4px 0;
+    padding-left: 28px;
+  }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    header, main { padding-left: 20px; padding-right: 20px; }
+    .section-content { padding-left: 20px; }
+    .crude-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 2rem; }
+    .cost-item { grid-template-columns: 120px 1fr 60px; }
+    .donut-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-label">Briefing Document · Energy Markets</div>
+  <h1>The <span>Oil</span> Game</h1>
+  <div class="header-sub">An interactive breakdown of global crude — from barrel to geopolitics</div>
+</header>
+
+<main>
+
+  <!-- SECTION 1: Crude Processing -->
+  <div class="section" id="s1">
+    <div class="section-header" onclick="toggle('s1')">
+      <span class="section-num">01</span>
+      <span class="section-title">Crude Processing & The Refinery</span>
+      <span class="section-tag">Infrastructure</span>
+      <div class="toggle-icon">+</div>
+    </div>
+    <div class="section-body">
+      <div class="section-content">
+        <div class="chart-container">
+          <div class="chart-title">// Distillation Column — What Comes Out Where</div>
+          <svg viewBox="0 0 700 420" class="refinery-svg" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="towerGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#1a3a1a"/>
+                <stop offset="40%" stop-color="#2a2a17"/>
+                <stop offset="100%" stop-color="#3a1a0a"/>
+              </linearGradient>
+              <linearGradient id="flameGrad" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stop-color="#b84c2a"/>
+                <stop offset="100%" stop-color="#e8813a" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Tower body -->
+            <rect x="280" y="40" width="100" height="340" fill="url(#towerGrad)" stroke="#2a2a24" stroke-width="1.5" rx="4"/>
+
+            <!-- Temperature gradient strip -->
+            <defs>
+              <linearGradient id="tempGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#4a8a4a" stop-opacity="0.4"/>
+                <stop offset="50%" stop-color="#c9a84c" stop-opacity="0.2"/>
+                <stop offset="100%" stop-color="#b84c2a" stop-opacity="0.5"/>
+              </linearGradient>
+            </defs>
+            <rect x="280" y="40" width="100" height="340" fill="url(#tempGrad)" rx="4"/>
+
+            <!-- Tray lines inside tower -->
+            <line x1="285" y1="110" x2="375" y2="110" stroke="#2a2a24" stroke-width="1"/>
+            <line x1="285" y1="170" x2="375" y2="170" stroke="#2a2a24" stroke-width="1"/>
+            <line x1="285" y1="230" x2="375" y2="230" stroke="#2a2a24" stroke-width="1"/>
+            <line x1="285" y1="295" x2="375" y2="295" stroke="#2a2a24" stroke-width="1"/>
+
+            <!-- Flame at bottom -->
+            <ellipse cx="330" cy="395" rx="30" ry="8" fill="#b84c2a" opacity="0.6"/>
+            <path d="M310,390 Q320,365 330,380 Q340,360 350,390 Z" fill="url(#flameGrad)" opacity="0.8"/>
+
+            <!-- Crude oil input arrow -->
+            <line x1="200" y1="310" x2="278" y2="310" stroke="#8a8678" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <polygon points="278,306 286,310 278,314" fill="#8a8678"/>
+            <text x="130" y="306" fill="#8a8678" font-size="10" letter-spacing="1">CRUDE OIL</text>
+            <text x="130" y="320" fill="#4a4840" font-size="9" letter-spacing="1">INPUT</text>
+
+            <!-- Output pipes & labels -->
+            <!-- LPG -->
+            <line x1="381" y1="58" x2="480" y2="58" stroke="#7a9e7e" stroke-width="1.5"/>
+            <circle cx="480" cy="58" r="3" fill="#7a9e7e"/>
+            <text x="490" y="54" fill="#7a9e7e" font-size="10" font-weight="500">LPG / GAS</text>
+            <text x="490" y="67" fill="#4a4840" font-size="9">~20°C</text>
+
+            <!-- Gasoline -->
+            <line x1="381" y1="98" x2="480" y2="98" stroke="#c9a84c" stroke-width="1.5"/>
+            <circle cx="480" cy="98" r="3" fill="#c9a84c"/>
+            <text x="490" y="94" fill="#c9a84c" font-size="10" font-weight="500">GASOLINE</text>
+            <text x="490" y="107" fill="#4a4840" font-size="9">~70°C</text>
+
+            <!-- Naphtha -->
+            <line x1="381" y1="148" x2="480" y2="148" stroke="#c9a84c" stroke-width="1.5" opacity="0.6"/>
+            <circle cx="480" cy="148" r="3" fill="#c9a84c" opacity="0.6"/>
+            <text x="490" y="144" fill="#c9a84c" font-size="10" opacity="0.7">NAPHTHA</text>
+            <text x="490" y="157" fill="#4a4840" font-size="9">~120°C → Petrochems</text>
+
+            <!-- Kerosene/Jet -->
+            <line x1="381" y1="200" x2="480" y2="200" stroke="#e8813a" stroke-width="1.5"/>
+            <circle cx="480" cy="200" r="3" fill="#e8813a"/>
+            <text x="490" y="196" fill="#e8813a" font-size="10" font-weight="500">JET FUEL</text>
+            <text x="490" y="209" fill="#4a4840" font-size="9">~200°C</text>
+
+            <!-- Diesel -->
+            <line x1="381" y1="255" x2="480" y2="255" stroke="#e8813a" stroke-width="1.5" opacity="0.7"/>
+            <circle cx="480" cy="255" r="3" fill="#e8813a" opacity="0.7"/>
+            <text x="490" y="251" fill="#e8813a" font-size="10" opacity="0.8">DIESEL / HO</text>
+            <text x="490" y="264" fill="#4a4840" font-size="9">~300°C</text>
+
+            <!-- Heavy fuel -->
+            <line x1="381" y1="320" x2="480" y2="320" stroke="#b84c2a" stroke-width="1.5"/>
+            <circle cx="480" cy="320" r="3" fill="#b84c2a"/>
+            <text x="490" y="316" fill="#b84c2a" font-size="10" font-weight="500">HEAVY OIL</text>
+            <text x="490" y="329" fill="#4a4840" font-size="9">~400°C</text>
+
+            <!-- Bitumen -->
+            <line x1="381" y1="365" x2="480" y2="365" stroke="#b84c2a" stroke-width="1.5" opacity="0.5"/>
+            <circle cx="480" cy="365" r="3" fill="#b84c2a" opacity="0.5"/>
+            <text x="490" y="361" fill="#b84c2a" font-size="10" opacity="0.6">BITUMEN / TAR</text>
+            <text x="490" y="374" fill="#4a4840" font-size="9">~500°C</text>
+
+            <!-- Temperature axis labels -->
+            <text x="255" y="50" fill="#4a4840" font-size="9" text-anchor="middle">COOL</text>
+            <text x="255" y="385" fill="#4a4840" font-size="9" text-anchor="middle">HOT</text>
+            <line x1="262" y1="55" x2="262" y2="378" stroke="#2a2a24" stroke-width="1"/>
+            <polygon points="259,60 262,50 265,60" fill="#4a4840"/>
+
+            <!-- Cracker annotation -->
+            <rect x="20" y="130" width="110" height="55" fill="none" stroke="#7a6530" stroke-width="1" stroke-dasharray="3,2" rx="2"/>
+            <text x="75" y="148" fill="#7a6530" font-size="9" text-anchor="middle" letter-spacing="1">CRACKER</text>
+            <text x="75" y="161" fill="#7a6530" font-size="9" text-anchor="middle">breaks heavy</text>
+            <text x="75" y="173" fill="#7a6530" font-size="9" text-anchor="middle">→ light frac.</text>
+            <line x1="130" y1="157" x2="200" y2="200" stroke="#7a6530" stroke-width="1" stroke-dasharray="3,2"/>
+
+            <!-- Tower label -->
+            <text x="330" y="28" fill="#4a4840" font-size="9" text-anchor="middle" letter-spacing="2">DISTILLATION COLUMN</text>
+          </svg>
+          <p class="chart-note">// Higher boiling point molecules fall lower. Cracker unit breaks heavy bottom fractions into lighter, more valuable products.</p>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">// One Barrel of Crude (159L) — What You Actually Get</div>
+          <div style="margin-top:8px;">
+            <div class="bar-row">
+              <span class="bar-label">Gasoline</span>
+              <div class="bar-track">
+                <div class="bar-fill" data-val="44%" style="width:44%; background: linear-gradient(90deg, #c9a84c, #a88030);"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">Diesel / Heat Oil</span>
+              <div class="bar-track">
+                <div class="bar-fill" data-val="27%" style="width:27%; background: linear-gradient(90deg, #e8813a, #c06020);"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">Jet Fuel</span>
+              <div class="bar-track">
+                <div class="bar-fill" data-val="9%" style="width:9%; background: linear-gradient(90deg, #e8813a, #c06020); opacity:0.7"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">Petrochems / Plastics</span>
+              <div class="bar-track">
+                <div class="bar-fill" data-val="6%" style="width:6%; background: linear-gradient(90deg, #7a9e7e, #5a7e5e);"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">Heavy Fuel Oil</span>
+              <div class="bar-track">
+                <div class="bar-fill" data-val="7%" style="width:7%; background: linear-gradient(90deg, #b84c2a, #902a10);"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">LPG / Other</span>
+              <div class="bar-track">
+                <div class="bar-fill" data-val="7%" style="width:7%; background: linear-gradient(90deg, #6a8a9e, #4a6a7e);"></div>
+              </div>
+            </div>
+          </div>
+          <p class="chart-note">// Cracking shifts output upward toward gasoline/diesel. A simple distillation-only refinery produces far less of the high-value top cuts.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: Types of Crude -->
+  <div class="section" id="s2">
+    <div class="section-header" onclick="toggle('s2')">
+      <span class="section-num">02</span>
+      <span class="section-title">Types of Crude — Light, Heavy, Sweet, Sour</span>
+      <span class="section-tag">Fundamentals</span>
+      <div class="toggle-icon">+</div>
+    </div>
+    <div class="section-body">
+      <div class="section-content">
+        <div class="chart-container">
+          <div class="chart-title">// The 2×2 Crude Quality Matrix</div>
+          <div class="crude-grid">
+            <div class="crude-card ls">
+              <div class="crude-card-title">Light Sweet</div>
+              <div class="crude-card-subtitle">The Premium Grade</div>
+              <div class="crude-card-desc">Small molecules, low sulfur. Easy to refine, naturally yields the most gasoline and jet fuel. Minimal processing required. West Texas Intermediate (WTI) and Brent crude are both in this category.</div>
+              <span class="crude-price-tag">Premium pricing · $2–5 above benchmark</span>
+            </div>
+            <div class="crude-card ss">
+              <div class="crude-card-title">Light Sour</div>
+              <div class="crude-card-subtitle">Common but Needs Treating</div>
+              <div class="crude-card-desc">Small molecules but high sulfur content. Requires desulfurization (hydrotreating) before products meet fuel standards. Slightly discounted vs sweet equivalents. Common in some Russian and Middle Eastern fields.</div>
+              <span class="crude-price-tag">Moderate discount · $1–3 below sweet</span>
+            </div>
+            <div class="crude-card lh">
+              <div class="crude-card-title">Heavy Sweet</div>
+              <div class="crude-card-subtitle">Rare but Processable</div>
+              <div class="crude-card-desc">Dense, viscous oil but low sulfur. Needs significant cracking to produce lighter products but avoids the sulfur headache. Relatively rare. Some Canadian synthetic crudes fall here after initial upgrading.</div>
+              <span class="crude-price-tag">Moderate discount · varies by refinery</span>
+            </div>
+            <div class="crude-card sh">
+              <div class="crude-card-title">Heavy Sour</div>
+              <div class="crude-card-subtitle">The Difficult Grade</div>
+              <div class="crude-card-desc">Dense AND high sulfur. Needs both extensive cracking AND desulfurization. Only refineries specifically built for it (coking units, deep conversion) can process it efficiently. Venezuelan heavy crude, some Canadian oil sands.</div>
+              <span class="crude-price-tag">Significant discount · $5–15 below WTI</span>
+            </div>
+          </div>
+          <p class="chart-note">// The US produces mainly light sweet (shale). OPEC produces a mix, mostly medium sour. This mismatch is why the US simultaneously exports and imports crude.</p>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">// Extraction Cost Ladder — Break-Even Per Barrel (USD)</div>
+          <div class="cost-ladder">
+            <div class="cost-item">
+              <span class="cost-name">Saudi Conv.</span>
+              <div class="bar-track"><div class="bar-fill" data-val="~$5/bbl" style="width:6%; background: linear-gradient(90deg, #7a9e7e, #5a7e5e);"></div></div>
+              <span class="cost-val">~$5</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-name">Iraq Conv.</span>
+              <div class="bar-track"><div class="bar-fill" data-val="~$10/bbl" style="width:12%; background: linear-gradient(90deg, #7a9e7e, #5a7e5e); opacity:0.8"></div></div>
+              <span class="cost-val">~$10</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-name">Russia Conv.</span>
+              <div class="bar-track"><div class="bar-fill" data-val="~$20/bbl" style="width:24%; background: linear-gradient(90deg, #c9a84c, #a88030);"></div></div>
+              <span class="cost-val">~$20</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-name">Brazil Deep Water</span>
+              <div class="bar-track"><div class="bar-fill" data-val="~$35/bbl" style="width:42%; background: linear-gradient(90deg, #c9a84c, #a88030); opacity:0.8"></div></div>
+              <span class="cost-val">~$35</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-name">US Shale (Permian)</span>
+              <div class="bar-track"><div class="bar-fill" data-val="~$45/bbl" style="width:54%; background: linear-gradient(90deg, #e8813a, #c06020);"></div></div>
+              <span class="cost-val">~$45</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-name">UK North Sea</span>
+              <div class="bar-track"><div class="bar-fill" data-val="~$50/bbl" style="width:60%; background: linear-gradient(90deg, #e8813a, #c06020); opacity:0.8"></div></div>
+              <span class="cost-val">~$50</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-name">Canada Oil Sands</span>
+              <div class="bar-track"><div class="bar-fill" data-val="~$70/bbl" style="width:84%; background: linear-gradient(90deg, #b84c2a, #902a10);"></div></div>
+              <span class="cost-val">~$70</span>
+            </div>
+          </div>
+          <p class="chart-note">// Current Brent price ~$65–70/bbl. At this price, oil sands are barely marginal and some North Sea fields are underwater. Saudi Arabia profits at almost any price.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: Market Share -->
+  <div class="section" id="s3">
+    <div class="section-header" onclick="toggle('s3')">
+      <span class="section-num">03</span>
+      <span class="section-title">OPEC+ vs The World — Production & Reserves</span>
+      <span class="section-tag">Market Structure</span>
+      <div class="toggle-icon">+</div>
+    </div>
+    <div class="section-body">
+      <div class="section-content">
+        <div class="chart-container">
+          <div class="chart-title">// Daily Production Share — ~102 Million Barrels/Day (2024)</div>
+          <div class="donut-row">
+            <svg viewBox="0 0 200 200" width="200" height="200" style="flex-shrink:0;">
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#1a1a17" stroke-width="30"/>
+              <!-- OPEC+ 47% -->
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#c9a84c" stroke-width="30"
+                stroke-dasharray="207.3 439.8" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+              <!-- USA ~13% -->
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#e8813a" stroke-width="30"
+                stroke-dasharray="57.4 589.7" stroke-dashoffset="-207.3" transform="rotate(-90 100 100)"/>
+              <!-- Canada ~6% -->
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#7a9e7e" stroke-width="30"
+                stroke-dasharray="26.4 620.7" stroke-dashoffset="-264.7" transform="rotate(-90 100 100)"/>
+              <!-- Brazil ~4% -->
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#6a8a9e" stroke-width="30"
+                stroke-dasharray="17.6 629.5" stroke-dashoffset="-291.1" transform="rotate(-90 100 100)"/>
+              <!-- Other ~30% -->
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#2a2a24" stroke-width="30"
+                stroke-dasharray="132.2 514.9" stroke-dashoffset="-308.7" transform="rotate(-90 100 100)"/>
+              <text x="100" y="96" text-anchor="middle" fill="#e8e4d9" font-size="20" font-weight="700" font-family="'Playfair Display', serif">102M</text>
+              <text x="100" y="112" text-anchor="middle" fill="#8a8678" font-size="9" letter-spacing="1">bbl/day</text>
+            </svg>
+            <div class="donut-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:#c9a84c"></div><span class="legend-text">OPEC+ (inc. Russia, Gulf) <span class="legend-val">47%</span></span></div>
+              <div class="legend-item"><div class="legend-dot" style="background:#e8813a"></div><span class="legend-text">United States <span class="legend-val">13%</span></span></div>
+              <div class="legend-item"><div class="legend-dot" style="background:#7a9e7e"></div><span class="legend-text">Canada <span class="legend-val">6%</span></span></div>
+              <div class="legend-item"><div class="legend-dot" style="background:#6a8a9e"></div><span class="legend-text">Brazil <span class="legend-val">4%</span></span></div>
+              <div class="legend-item"><div class="legend-dot" style="background:#2a2a24; border:1px solid #4a4840"></div><span class="legend-text">Rest of Non-OPEC+ <span class="legend-val">30%</span></span></div>
+            </div>
+          </div>
+          <p class="chart-note">// OPEC+ share has fallen from 53% in 2016 to ~47% in 2024 — US shale drove this shift. But OPEC+ controls almost all spare capacity.</p>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">// Proven Reserves — 1,567 Billion Barrels Total (2024)</div>
+          <div class="donut-row">
+            <svg viewBox="0 0 200 200" width="200" height="200" style="flex-shrink:0;">
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#1a1a17" stroke-width="30"/>
+              <!-- OPEC 79% -->
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#c9a84c" stroke-width="30"
+                stroke-dasharray="347.6 299.5" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+              <!-- Canada ~10% -->
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#7a9e7e" stroke-width="30"
+                stroke-dasharray="44 603.1" stroke-dashoffset="-347.6" transform="rotate(-90 100 100)"/>
+              <!-- Russia ~7% -->
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#6a8a9e" stroke-width="30"
+                stroke-dasharray="30.8 616.3" stroke-dashoffset="-391.6" transform="rotate(-90 100 100)"/>
+              <!-- Other 4% -->
+              <circle cx="100" cy="100" r="70" fill="none" stroke="#2a2a24" stroke-width="30"
+                stroke-dasharray="17.6 629.5" stroke-dashoffset="-422.4" transform="rotate(-90 100 100)"/>
+              <text x="100" y="96" text-anchor="middle" fill="#e8e4d9" font-size="20" font-weight="700" font-family="'Playfair Display', serif">1,567</text>
+              <text x="100" y="112" text-anchor="middle" fill="#8a8678" font-size="9" letter-spacing="1">bn barrels</text>
+            </svg>
+            <div class="donut-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:#c9a84c"></div><span class="legend-text">OPEC nations <span class="legend-val">79%</span></span></div>
+              <div class="legend-item"><div class="legend-dot" style="background:#7a9e7e"></div><span class="legend-text">Canada (oil sands) <span class="legend-val">~10%</span></span></div>
+              <div class="legend-item"><div class="legend-dot" style="background:#6a8a9e"></div><span class="legend-text">Russia <span class="legend-val">~7%</span></span></div>
+              <div class="legend-item"><div class="legend-dot" style="background:#2a2a24; border:1px solid #4a4840"></div><span class="legend-text">Rest of world <span class="legend-val">~4%</span></span></div>
+            </div>
+          </div>
+          <p class="chart-note">// Production share ≠ reserve share. OPEC pumps 47% today but holds 79% of what's left in the ground. The long-game advantage is clear.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: Trade Routes & Geopolitics -->
+  <div class="section" id="s4">
+    <div class="section-header" onclick="toggle('s4')">
+      <span class="section-num">04</span>
+      <span class="section-title">Geopolitics & Global Trade Routes</span>
+      <span class="section-tag">Geopolitics</span>
+      <div class="toggle-icon">+</div>
+    </div>
+    <div class="section-body">
+      <div class="section-content">
+        <div class="chart-container">
+          <div class="chart-title">// Major Oil Flows — Who Buys From Whom</div>
+          <svg viewBox="0 0 700 380" style="width:100%;height:auto;">
+            <!-- Regions as nodes -->
+            <!-- Middle East -->
+            <ellipse cx="380" cy="180" rx="55" ry="30" fill="#1a1a10" stroke="#c9a84c" stroke-width="1.5"/>
+            <text x="380" y="176" text-anchor="middle" fill="#c9a84c" font-size="9" font-weight="500" letter-spacing="1">MIDDLE EAST</text>
+            <text x="380" y="189" text-anchor="middle" fill="#7a6530" font-size="8">OPEC core</text>
+
+            <!-- USA -->
+            <ellipse cx="120" cy="130" rx="50" ry="26" fill="#1a1a10" stroke="#e8813a" stroke-width="1.5"/>
+            <text x="120" y="126" text-anchor="middle" fill="#e8813a" font-size="9" font-weight="500" letter-spacing="1">USA</text>
+            <text x="120" y="139" text-anchor="middle" fill="#7a4820" font-size="8">Producer + Importer</text>
+
+            <!-- Europe -->
+            <ellipse cx="240" cy="70" rx="48" ry="26" fill="#1a1a10" stroke="#8a8678" stroke-width="1.5"/>
+            <text x="240" y="66" text-anchor="middle" fill="#8a8678" font-size="9" font-weight="500" letter-spacing="1">EUROPE</text>
+            <text x="240" y="79" text-anchor="middle" fill="#4a4840" font-size="8">Net importer</text>
+
+            <!-- China -->
+            <ellipse cx="560" cy="100" rx="50" ry="26" fill="#1a1a10" stroke="#b84c2a" stroke-width="1.5"/>
+            <text x="560" y="96" text-anchor="middle" fill="#b84c2a" font-size="9" font-weight="500" letter-spacing="1">CHINA</text>
+            <text x="560" y="109" text-anchor="middle" fill="#7a2a10" font-size="8">Largest importer</text>
+
+            <!-- India -->
+            <ellipse cx="560" cy="220" rx="45" ry="24" fill="#1a1a10" stroke="#7a9e7e" stroke-width="1.5"/>
+            <text x="560" y="216" text-anchor="middle" fill="#7a9e7e" font-size="9" font-weight="500" letter-spacing="1">INDIA</text>
+            <text x="560" y="229" text-anchor="middle" fill="#3a5e3e" font-size="8">Fast-growing import</text>
+
+            <!-- Russia -->
+            <ellipse cx="380" cy="50" rx="48" ry="24" fill="#1a1a10" stroke="#6a8a9e" stroke-width="1.5"/>
+            <text x="380" y="46" text-anchor="middle" fill="#6a8a9e" font-size="9" font-weight="500" letter-spacing="1">RUSSIA</text>
+            <text x="380" y="59" text-anchor="middle" fill="#3a5a6e" font-size="8">Shadow exports</text>
+
+            <!-- Canada -->
+            <ellipse cx="100" cy="260" rx="45" ry="24" fill="#1a1a10" stroke="#7a9e7e" stroke-width="1.5"/>
+            <text x="100" y="256" text-anchor="middle" fill="#7a9e7e" font-size="9" font-weight="500" letter-spacing="1">CANADA</text>
+            <text x="100" y="269" text-anchor="middle" fill="#3a5e3e" font-size="8">Exports to USA</text>
+
+            <!-- Trade flow arrows -->
+            <!-- ME → China (biggest flow) -->
+            <path d="M434,172 Q500,130 511,112" stroke="#c9a84c" stroke-width="2.5" fill="none" opacity="0.7" marker-end="url(#arrowGold)"/>
+            <text x="490" y="148" fill="#7a6530" font-size="8">71% of OPEC exports</text>
+
+            <!-- ME → India -->
+            <path d="M434,188 Q500,200 516,210" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.5"/>
+            <polygon points="514,206 520,213 507,213" fill="#c9a84c" opacity="0.5"/>
+
+            <!-- ME → Europe -->
+            <path d="M332,162 Q285,115 286,92" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.4"/>
+            <polygon points="283,95 287,85 291,95" fill="#c9a84c" opacity="0.4"/>
+
+            <!-- Russia → China (sanctions workaround) -->
+            <path d="M426,58 Q500,70 511,88" stroke="#6a8a9e" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7"/>
+            <polygon points="508,85 515,93 504,94" fill="#6a8a9e" opacity="0.7"/>
+            <text x="490" y="68" fill="#4a6a7e" font-size="8">Sanctioned route</text>
+
+            <!-- Russia → India -->
+            <path d="M430,62 Q510,140 517,198" stroke="#6a8a9e" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.5"/>
+            <polygon points="514,196 519,205 508,203" fill="#6a8a9e" opacity="0.5"/>
+
+            <!-- Canada → USA -->
+            <path d="M144,250 Q145,200 128,154" stroke="#7a9e7e" stroke-width="1.5" fill="none" opacity="0.7"/>
+            <polygon points="125,157 129,147 133,157" fill="#7a9e7e" opacity="0.7"/>
+            <text x="152" y="210" fill="#3a5e3e" font-size="8">52% of US imports</text>
+
+            <!-- USA exports → Europe -->
+            <path d="M168,118 Q200,90 192,88" stroke="#e8813a" stroke-width="1.5" fill="none" opacity="0.6"/>
+            <polygon points="190,85 196,92 184,92" fill="#e8813a" opacity="0.6"/>
+
+            <!-- Strait annotations -->
+            <rect x="370" y="230" width="110" height="32" fill="rgba(184,76,42,0.08)" stroke="#b84c2a" stroke-width="0.5" rx="2"/>
+            <text x="425" y="244" text-anchor="middle" fill="#b84c2a" font-size="8" letter-spacing="1">STRAIT OF HORMUZ</text>
+            <text x="425" y="256" text-anchor="middle" fill="#7a2a10" font-size="8">20% of global supply passes here</text>
+
+            <rect x="20" y="310" width="130" height="32" fill="rgba(201,168,76,0.05)" stroke="#7a6530" stroke-width="0.5" rx="2"/>
+            <text x="85" y="324" text-anchor="middle" fill="#7a6530" font-size="8" letter-spacing="1">PETRODOLLAR SYSTEM</text>
+            <text x="85" y="336" text-anchor="middle" fill="#4a4028" font-size="8">All trades priced in USD</text>
+
+            <rect x="480" y="310" width="140" height="32" fill="rgba(106,138,158,0.08)" stroke="#4a6a7e" stroke-width="0.5" rx="2"/>
+            <text x="550" y="324" text-anchor="middle" fill="#6a8a9e" font-size="8" letter-spacing="1">YUAN OIL CONTRACTS</text>
+            <text x="550" y="336" text-anchor="middle" fill="#3a5a6e" font-size="8">Growing China pressure on USD</text>
+          </svg>
+          <p class="chart-note">// Dashed lines = sanctioned/shadow flows. The Strait of Hormuz is the single most critical chokepoint — any disruption there is an instant global price shock.</p>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">// The Petrodollar Architecture</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:8px;">
+            <div style="background:var(--surface2); padding:20px; border:1px solid var(--border); border-radius:4px;">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:9px; color:var(--gold-dim); letter-spacing:2px; margin-bottom:10px;">THE DEAL (1974)</div>
+              <div style="font-size:12px; color:var(--text-dim); line-height:1.7;">Saudi Arabia agrees to price oil exclusively in USD and recycle profits into US Treasuries. USA provides military protection.</div>
+            </div>
+            <div style="background:var(--surface2); padding:20px; border:1px solid var(--border); border-radius:4px;">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:9px; color:var(--amber); letter-spacing:2px; margin-bottom:10px;">THE EFFECT</div>
+              <div style="font-size:12px; color:var(--text-dim); line-height:1.7;">Every country on earth needs USD to buy oil. This creates permanent structural demand for dollars — underwriting US financial dominance globally.</div>
+            </div>
+            <div style="background:var(--surface2); padding:20px; border:1px solid var(--border); border-radius:4px;">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:9px; color:var(--rust); letter-spacing:2px; margin-bottom:10px;">THE STRESS (NOW)</div>
+              <div style="font-size:12px; color:var(--text-dim); line-height:1.7;">China pushing yuan-denominated oil contracts with Gulf states. Saudi Arabia is hedging. A successful shift would be the most significant blow to USD dominance in 50 years.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: Oil Trajectory -->
+  <div class="section" id="s5">
+    <div class="section-header" onclick="toggle('s5')">
+      <span class="section-num">05</span>
+      <span class="section-title">Oil's Future Trajectory — Demand, Pricing & The Endgame</span>
+      <span class="section-tag">Macro</span>
+      <div class="toggle-icon">+</div>
+    </div>
+    <div class="section-body">
+      <div class="section-content">
+        <div class="chart-container">
+          <div class="chart-title">// Demand Trajectory — Fuel vs Petrochemical Use</div>
+          <svg viewBox="0 0 640 280" style="width:100%;height:auto;">
+            <!-- Grid -->
+            <line x1="60" y1="20" x2="60" y2="220" stroke="#2a2a24" stroke-width="1"/>
+            <line x1="60" y1="220" x2="620" y2="220" stroke="#2a2a24" stroke-width="1"/>
+
+            <!-- Grid lines -->
+            <line x1="60" y1="70" x2="620" y2="70" stroke="#1a1a17" stroke-width="1"/>
+            <line x1="60" y1="120" x2="620" y2="120" stroke="#1a1a17" stroke-width="1"/>
+            <line x1="60" y1="170" x2="620" y2="170" stroke="#1a1a17" stroke-width="1"/>
+
+            <!-- Y axis labels -->
+            <text x="50" y="74" text-anchor="end" fill="#4a4840" font-size="9">HIGH</text>
+            <text x="50" y="124" text-anchor="end" fill="#4a4840" font-size="9">MED</text>
+            <text x="50" y="174" text-anchor="end" fill="#4a4840" font-size="9">LOW</text>
+
+            <!-- X axis labels -->
+            <text x="100" y="235" text-anchor="middle" fill="#4a4840" font-size="9">2010</text>
+            <text x="195" y="235" text-anchor="middle" fill="#4a4840" font-size="9">2020</text>
+            <text x="290" y="235" text-anchor="middle" fill="#4a4840" font-size="9">2025</text>
+            <text x="400" y="235" text-anchor="middle" fill="#4a4840" font-size="9">2030</text>
+            <text x="510" y="235" text-anchor="middle" fill="#4a4840" font-size="9">2040</text>
+            <text x="600" y="235" text-anchor="middle" fill="#4a4840" font-size="9">2050</text>
+
+            <!-- "NOW" marker -->
+            <line x1="290" y1="20" x2="290" y2="220" stroke="#7a6530" stroke-width="1" stroke-dasharray="3,3"/>
+            <text x="293" y="35" fill="#7a6530" font-size="8" letter-spacing="1">NOW</text>
+
+            <!-- Total oil demand curve (rise then fall) -->
+            <path d="M100,150 C150,110 200,80 290,72 C370,65 420,75 480,100 C540,128 580,155 610,180"
+              stroke="#c9a84c" stroke-width="2" fill="none" opacity="0.9"/>
+            <!-- Dotted continuation -->
+            <path d="M290,72 C370,65 420,75 480,100 C540,128 580,155 610,180"
+              stroke="#c9a84c" stroke-width="2" fill="none" opacity="0.4" stroke-dasharray="5,3"/>
+
+            <!-- Fuel demand (subset) -->
+            <path d="M100,158 C150,122 200,95 290,88 C370,82 420,98 480,130 C540,162 580,188 610,208"
+              stroke="#e8813a" stroke-width="1.5" fill="none" opacity="0.7"/>
+            <path d="M290,88 C370,82 420,98 480,130 C540,162 580,188 610,208"
+              stroke="#e8813a" stroke-width="1.5" fill="none" opacity="0.3" stroke-dasharray="5,3"/>
+
+            <!-- Petrochemical demand (grows) -->
+            <path d="M100,195 C150,190 200,182 290,175 C370,168 420,160 480,152 C540,144 580,136 610,128"
+              stroke="#7a9e7e" stroke-width="1.5" fill="none" opacity="0.8"/>
+            <path d="M290,175 C370,168 420,160 480,152 C540,144 580,136 610,128"
+              stroke="#7a9e7e" stroke-width="1.5" fill="none" opacity="0.5" stroke-dasharray="5,3"/>
+
+            <!-- Legend -->
+            <line x1="70" y1="255" x2="95" y2="255" stroke="#c9a84c" stroke-width="2"/>
+            <text x="100" y="259" fill="#8a8678" font-size="9">Total oil demand</text>
+            <line x1="220" y1="255" x2="245" y2="255" stroke="#e8813a" stroke-width="1.5"/>
+            <text x="250" y="259" fill="#8a8678" font-size="9">Fuel demand (EV impact)</text>
+            <line x1="400" y1="255" x2="425" y2="255" stroke="#7a9e7e" stroke-width="1.5"/>
+            <text x="430" y="259" fill="#8a8678" font-size="9">Petrochemical demand</text>
+          </svg>
+          <p class="chart-note">// IEA projects fuel demand peaking late 2020s. Petrochemical demand continues growing independently. The two lines decouple — oil stays relevant even as cars go electric.</p>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">// The Price War Endgame — Who Survives What Price</div>
+          <svg viewBox="0 0 640 200" style="width:100%;height:auto;">
+            <line x1="60" y1="160" x2="620" y2="160" stroke="#2a2a24" stroke-width="1"/>
+
+            <!-- Price axis -->
+            <text x="100" y="175" text-anchor="middle" fill="#4a4840" font-size="9">$20</text>
+            <text x="200" y="175" text-anchor="middle" fill="#4a4840" font-size="9">$40</text>
+            <text x="300" y="175" text-anchor="middle" fill="#4a4840" font-size="9">$60</text>
+            <text x="400" y="175" text-anchor="middle" fill="#4a4840" font-size="9">$80</text>
+            <text x="500" y="175" text-anchor="middle" fill="#4a4840" font-size="9">$100</text>
+
+            <!-- Survival zones -->
+            <!-- Saudi - survives everything -->
+            <rect x="65" y="20" width="555" height="22" fill="#7a9e7e" opacity="0.15" rx="2"/>
+            <text x="70" y="35" fill="#7a9e7e" font-size="9" font-weight="500">Saudi Arabia — profitable from ~$5/bbl</text>
+
+            <!-- Iraq/Kuwait -->
+            <rect x="90" y="48" width="530" height="22" fill="#7a9e7e" opacity="0.1" rx="2"/>
+            <text x="95" y="63" fill="#7a9e7e" font-size="9" opacity="0.8">Iraq / Kuwait — from ~$10/bbl</text>
+
+            <!-- Russia -->
+            <rect x="155" y="76" width="465" height="22" fill="#c9a84c" opacity="0.1" rx="2"/>
+            <text x="160" y="91" fill="#c9a84c" font-size="9">Russia — from ~$20/bbl (+ political pressure)</text>
+
+            <!-- Brazil deepwater -->
+            <rect x="280" y="104" width="340" height="22" fill="#e8813a" opacity="0.1" rx="2"/>
+            <text x="285" y="119" fill="#e8813a" font-size="9">Brazil / North Sea — from ~$35–50/bbl</text>
+
+            <!-- US Shale -->
+            <rect x="350" y="132" width="270" height="22" fill="#b84c2a" opacity="0.15" rx="2"/>
+            <text x="355" y="147" fill="#b84c2a" font-size="9">US Shale / Canada Oil Sands — from ~$45–70/bbl</text>
+
+            <!-- Current price marker -->
+            <line x1="305" y1="10" x2="305" y2="165" stroke="#c9a84c" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="308" y="18" fill="#c9a84c" font-size="8" letter-spacing="1">~$65 TODAY</text>
+          </svg>
+          <p class="chart-note">// In a sustained price war below $45, US shale and Canadian oil sands become uneconomical. Saudi Arabia can profitably flood the market at any price above $5. This asymmetry is OPEC's ultimate weapon.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 6: The Theses -->
+  <div class="section" id="s6">
+    <div class="section-header" onclick="toggle('s6')">
+      <span class="section-num">06</span>
+      <span class="section-title">The Investment Theses — Multiple Plays From One Macro Shift</span>
+      <span class="section-tag">Strategy</span>
+      <div class="toggle-icon">+</div>
+    </div>
+    <div class="section-body">
+      <div class="section-content">
+        <div class="chart-container">
+          <div class="chart-title">// Thesis Map — Who Benefits From Peak Oil Demand</div>
+          <div class="thesis-grid">
+            <div class="thesis-card bull">
+              <div class="thesis-card-icon">⚗️</div>
+              <div class="thesis-card-title">Specialty Chemicals & Petrochemicals</div>
+              <div class="thesis-card-body">As oil-as-fuel demand drops, feedstock (naphtha, ethane) gets cheaper. Chemical companies converting cheap inputs into high-margin engineered materials are the leveraged play. SABIC, LyondellBasell, Dow.</div>
+              <span class="thesis-signal">Bullish · 2030–2045 window</span>
+            </div>
+            <div class="thesis-card bull">
+              <div class="thesis-card-icon">🧪</div>
+              <div class="thesis-card-title">Advanced Polymers & Engineered Materials</div>
+              <div class="thesis-card-body">Specialty polymers for EVs, aerospace, medical devices. Low regulatory risk vs commodity plastics. High margin, IP-protected, demand growing independently of energy transition direction.</div>
+              <span class="thesis-signal">Bullish · structural tailwind</span>
+            </div>
+            <div class="thesis-card neutral">
+              <div class="thesis-card-icon">🛢️</div>
+              <div class="thesis-card-title">Gulf State Downstream Expansion</div>
+              <div class="thesis-card-body">Saudi Arabia (SABIC/Aramco), UAE (ADNOC) building massive domestic petrochemical capacity. They're racing to capture the chemicals margin themselves rather than selling cheap crude upstream. Watch their capex.</div>
+              <span class="thesis-signal">Watching · strategic pivot</span>
+            </div>
+            <div class="thesis-card bear">
+              <div class="thesis-card-icon">♻️</div>
+              <div class="thesis-card-title">Bio-Based Plastics (Near Term)</div>
+              <div class="thesis-card-body">If oil gets cheap in the price war window, bio-plastics lose their cost competitiveness. They need expensive oil to be viable at scale. The transition thesis here depends entirely on price assumptions going the right way.</div>
+              <span class="thesis-signal">Cautious · headwind from cheap oil</span>
+            </div>
+            <div class="thesis-card bull">
+              <div class="thesis-card-icon">⚡</div>
+              <div class="thesis-card-title">Energy Transition Infrastructure</div>
+              <div class="thesis-card-body">Solar, wind, grid storage, EV charging infrastructure. Accelerated as oil demand peaks. Ironically, solar panels and EV batteries require significant petrochemical inputs — the old and new economy are entangled.</div>
+              <span class="thesis-signal">Bullish · secular tailwind</span>
+            </div>
+            <div class="thesis-card neutral">
+              <div class="thesis-card-icon">🔬</div>
+              <div class="thesis-card-title">Silicone & Silicon-Based Materials</div>
+              <div class="thesis-card-body">Not petroleum-derived — follows EV, solar, and electronics demand instead. Completely separate thesis from oil pricing. Demand grows as oil declines. Wacker Chemie, Shin-Etsu Chemical are key names.</div>
+              <span class="thesis-signal">Structural · unrelated to oil price</span>
+            </div>
+            <div class="thesis-card bull">
+              <div class="thesis-card-icon">🏭</div>
+              <div class="thesis-card-title">Cheap-Input Manufacturing</div>
+              <div class="thesis-card-body">If oil floods the market in the price war window (2030s–2040s), energy-intensive manufacturing gets a structural cost advantage. Petrochemical-dependent goods become cheaper to produce. Industrial manufacturers win.</div>
+              <span class="thesis-signal">Bullish · medium-term window</span>
+            </div>
+            <div class="thesis-card bear">
+              <div class="thesis-card-icon">⛽</div>
+              <div class="thesis-card-title">Upstream E&P (Expensive Oil)</div>
+              <div class="thesis-card-body">US shale, Canadian oil sands, North Sea — high cost, high capital intensity, first to be stranded. EV adoption + potential price war from OPEC = double squeeze. Long-term capex into these assets looks increasingly misallocated.</div>
+              <span class="thesis-signal">Bearish · stranded asset risk</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 7: Petrochemical Chain -->
+  <div class="section" id="s7">
+    <div class="section-header" onclick="toggle('s7')">
+      <span class="section-num">07</span>
+      <span class="section-title">The Petrochemical Value Chain</span>
+      <span class="section-tag">Deep Dive</span>
+      <div class="toggle-icon">+</div>
+    </div>
+    <div class="section-body">
+      <div class="section-content">
+        <div class="chart-container">
+          <div class="chart-title">// From Crude to End Product — The Full Chain</div>
+          <div class="chem-chain">
+            <div class="chem-level">
+              <span class="chem-level-label">Feedstock</span>
+              <div class="chem-items">
+                <div class="chem-item highlight">Crude Oil</div>
+                <div class="chem-item highlight">Natural Gas</div>
+              </div>
+            </div>
+            <div class="chem-connector">↓</div>
+            <div class="chem-level">
+              <span class="chem-level-label">Primary</span>
+              <div class="chem-items">
+                <div class="chem-item highlight">Naphtha</div>
+                <div class="chem-item highlight">Ethane</div>
+                <div class="chem-item highlight">Propane</div>
+                <div class="chem-item">LPG</div>
+              </div>
+            </div>
+            <div class="chem-connector">↓ Steam Cracker (~850°C)</div>
+            <div class="chem-level">
+              <span class="chem-level-label">Olefins / Aromatics</span>
+              <div class="chem-items">
+                <div class="chem-item highlight">Ethylene</div>
+                <div class="chem-item highlight">Propylene</div>
+                <div class="chem-item highlight">Butadiene</div>
+                <div class="chem-item highlight">Benzene</div>
+                <div class="chem-item">Toluene</div>
+                <div class="chem-item">Xylene</div>
+              </div>
+            </div>
+            <div class="chem-connector">↓ Polymerization / Reaction</div>
+            <div class="chem-level">
+              <span class="chem-level-label">Commodity Polymers</span>
+              <div class="chem-items">
+                <div class="chem-item">Polyethylene (PE)</div>
+                <div class="chem-item">Polypropylene (PP)</div>
+                <div class="chem-item">PVC</div>
+                <div class="chem-item">Polystyrene</div>
+                <div class="chem-item">Synthetic Rubber</div>
+                <div class="chem-item">Nylon</div>
+                <div class="chem-item">Polyester</div>
+              </div>
+            </div>
+            <div class="chem-connector">↓ Compounding / Engineering</div>
+            <div class="chem-level">
+              <span class="chem-level-label">Specialty / High Margin</span>
+              <div class="chem-items">
+                <div class="chem-item highlight">Carbon Fibre</div>
+                <div class="chem-item highlight">Engineering Polymers</div>
+                <div class="chem-item highlight">Pharma Intermediates</div>
+                <div class="chem-item highlight">Adhesives & Coatings</div>
+                <div class="chem-item highlight">Electronic Materials</div>
+                <div class="chem-item">Agrochemicals</div>
+              </div>
+            </div>
+            <div class="chem-connector">↓</div>
+            <div class="chem-level">
+              <span class="chem-level-label">End Use</span>
+              <div class="chem-items">
+                <div class="chem-item">Packaging</div>
+                <div class="chem-item">Automotive</div>
+                <div class="chem-item">Electronics</div>
+                <div class="chem-item">Medical Devices</div>
+                <div class="chem-item">Textiles</div>
+                <div class="chem-item">Construction</div>
+                <div class="chem-item">Aerospace</div>
+              </div>
+            </div>
+          </div>
+          <p class="chart-note">// Highlighted items = where margin concentrates. Moving down the chain = higher value, more IP, lower volume. The sweet spot is specialty chemicals — cheap feedstock, expensive output.</p>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">// Plastic Alternatives — Maturity & Viability</div>
+          <div style="margin-top:8px;">
+            <div class="bar-row">
+              <span class="bar-label">Conventional Plastic</span>
+              <div class="bar-track"><div class="bar-fill" data-val="Market ready · 99%" style="width:99%; background: linear-gradient(90deg, #c9a84c, #a88030);"></div></div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">Mechanical Recycling</span>
+              <div class="bar-track"><div class="bar-fill" data-val="Deployed · 9% actual rate" style="width:60%; background: linear-gradient(90deg, #7a9e7e, #5a7e5e);"></div></div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">PLA (bio-based)</span>
+              <div class="bar-track"><div class="bar-fill" data-val="~1% market share" style="width:30%; background: linear-gradient(90deg, #6a8a9e, #4a6a7e);"></div></div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">Chemical Recycling</span>
+              <div class="bar-track"><div class="bar-fill" data-val="Pilot scale" style="width:15%; background: linear-gradient(90deg, #8a6a4e, #6a4a2e);"></div></div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">PHA (bacterial)</span>
+              <div class="bar-track"><div class="bar-fill" data-val="Early commercial" style="width:8%; background: linear-gradient(90deg, #7a9e7e, #5a7e5e); opacity:0.5"></div></div>
+            </div>
+          </div>
+          <p class="chart-note">// Bio-alternatives are real and improving but face a paradox: they only become cost-competitive when oil is expensive. A price war scenario actively sets back the alternatives timeline.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  function toggle(id) {
+    const section = document.getElementById(id);
+    const icon = section.querySelector('.toggle-icon');
+    const isOpen = section.classList.contains('open');
+    
+    // Close all
+    document.querySelectorAll('.section').forEach(s => {
+      s.classList.remove('open');
+      s.querySelector('.toggle-icon').textContent = '+';
+    });
+
+    // Open if was closed
+    if (!isOpen) {
+      section.classList.add('open');
+      icon.textContent = '−';
+    }
+  }
+
+  // Open first section by default
+  document.addEventListener('DOMContentLoaded', () => {
+    toggle('s1');
+  });
+</script>
+
+</body>
+</html>
