@@ -4,6 +4,10 @@
 
 *Briefing Document · Energy Markets*
 
+**Live dashboard:** [lunaticwithaduck.github.io/crude_overview](https://lunaticwithaduck.github.io/crude_overview)
+
+The interactive HTML dashboard (`oil_dashboard.html`) is automatically deployed to GitHub Pages on every push to `main` via the [deploy workflow](.github/workflows/deploy.yml).
+
 ---
 
 ## 01 · Crude Processing & The Refinery
